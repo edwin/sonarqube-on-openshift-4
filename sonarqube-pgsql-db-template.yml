@@ -1,19 +1,19 @@
 apiVersion: v1
 kind: Template
 labels:
-  template: sonarqube-h2-db-template
+  template: sonarqube-pgsql-db-template
 message: A Sonarqube service has been created in your project. You can access using admin/admin.
 metadata:
   annotations:
     description: |-
-      Sonarqube service, with H2 DB.
-      NOTE: Data will not be gone despite restarts, but dont use this for production usage.
-    openshift.io/display-name: SonarQube (H2 DB)
+      Sonarqube service, with Postgresql DB.
+      NOTE: Data will not be gone despite restarts, preferable for production usages.
+    openshift.io/display-name: SonarQube (Postgresql DB)
     openshift.io/documentation-url: https://docs.sonarqube.org/
-    openshift.io/long-description: This template deploys a SonarQube server with an embeddable H2 DB.
+    openshift.io/long-description: This template deploys a SonarQube server with a standalone Postgresql DB.
     tags: instant-app,sonarqube
   creationTimestamp: null
-  name: sonarqube-h2-db
+  name: sonarqube-pgsql-db
 objects:
 - apiVersion: v1
   kind: Route
@@ -58,6 +58,13 @@ objects:
               port: 9000
             initialDelaySeconds: 420
             timeoutSeconds: 3
+          env:
+            - name: SONAR_JDBC_URL
+              value: jdbc:postgresql://${SONARQUBE_SERVICE_NAME}-pgsql:5432/sonar
+            - name: SONAR_JDBC_USERNAME
+              value: sonar
+            - name: SONAR_JDBC_PASSWORD
+              value: sonar
           name: sonarqube
           readinessProbe:
             httpGet:
@@ -138,6 +145,101 @@ objects:
         storage: 1Gi
     accessModes:
     - ReadWriteOnce
+
+# postgresql starts here
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    annotations:
+      template.alpha.openshift.io/wait-for-ready: "true"
+    name: ${SONARQUBE_SERVICE_NAME}-pgsql
+  spec:
+    replicas: 1
+    selector:
+      name: ${SONARQUBE_SERVICE_NAME}-pgsql
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          name: ${SONARQUBE_SERVICE_NAME}-pgsql
+      spec:
+        containers:
+        - capabilities: {}
+          env:
+          - name: POSTGRESQL_USER
+            value: sonar
+          - name: POSTGRESQL_PASSWORD
+            value: sonar
+          - name: POSTGRESQL_DATABASE
+            value: sonar
+          image: 'image-registry.openshift-image-registry.svc:5000/openshift/postgresql:12'
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            exec:
+              command:
+              - /usr/libexec/check-container
+              - --live
+            initialDelaySeconds: 120
+            timeoutSeconds: 10
+          name: postgresql
+          ports:
+          - containerPort: 5432
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - /usr/libexec/check-container
+            initialDelaySeconds: 5
+            timeoutSeconds: 1
+          resources:
+            limits:
+              memory: 512Mi
+          securityContext:
+            capabilities: {}
+            privileged: false
+          terminationMessagePath: /dev/termination-log
+          volumeMounts:
+          - mountPath: /var/lib/pgsql/data
+            name: ${SONARQUBE_SERVICE_NAME}-pgsql-data
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        volumes:
+        - name: ${SONARQUBE_SERVICE_NAME}-pgsql-data
+          persistentVolumeClaim:
+            claimName: ${SONARQUBE_SERVICE_NAME}-pgsql-data
+    triggers:
+    - type: ConfigChange
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: ${SONARQUBE_SERVICE_NAME}-pgsql-data
+  spec:
+    resources:
+      requests:
+        storage: 1Gi
+    accessModes:
+    - ReadWriteOnce
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      template.openshift.io/expose-uri: postgres://{.spec.clusterIP}:{.spec.ports[?(.name=="postgresql")].port}
+    name: ${SONARQUBE_SERVICE_NAME}-pgsql
+  spec:
+    ports:
+    - name: postgresql
+      nodePort: 0
+      port: 5432
+      protocol: TCP
+      targetPort: 5432
+    selector:
+      name: ${SONARQUBE_SERVICE_NAME}-pgsql
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+
 parameters:
 - description: The name of the OpenShift Service exposed for the SonarQube container.
   displayName: SonarQube Service Name
