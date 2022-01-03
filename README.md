@@ -33,6 +33,13 @@ Versions
 - Postgresql 12
 
 
+Blog Post
+------------
+```
+https://edwin.baculsoft.com/2022/01/deploying-sonarqube-to-openshift-4-by-using-openshift-template/
+```
+
+
 Disclaimer
 ------------
 
