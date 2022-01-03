@@ -9,21 +9,21 @@ How To
 
 Deploy template to Openshift, and creating a new application based on it. For Sonarqube with in-memory DB, 
 ```
-oc create -f sonarqube-h2-db-template.yml
+$ oc create -f sonarqube-h2-db-template.yml
 
-oc new-app --template sonarqube-h2-db
+$ oc new-app --template sonarqube-h2-db
 ```
 
 For Sonarqube with Postgresql database,
 ```
-oc create -f sonarqube-pgsql-db-template.yml
+$ oc create -f sonarqube-pgsql-db-template.yml
 
-oc new-app --template sonarqube-pgsql-db
+$ oc new-app --template sonarqube-pgsql-db
 ```
 
 Run maven command to check your code against Sonarqube
 ```
-mvn clean verify sonar:sonar -Dsonar.projectKey=my-project -Dsonar.host.url=http://openshift-url -Dsonar.login=sonar-token
+$ mvn clean verify sonar:sonar -Dsonar.projectKey=my-project -Dsonar.host.url=http://openshift-url -Dsonar.login=sonar-token
 ```
 
 Versions
